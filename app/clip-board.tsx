@@ -53,7 +53,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
     return `${window.location.origin}/${normalizedSlug}`;
   }, [normalizedSlug]);
 
-  const loadClip = useCallback(async (targetSlug: string, quiet = false) => {
+  const loadClip = useCallback(async (targetSlug: string, quiet = false, force = false) => {
     const safeSlug = cleanSlug(targetSlug);
     if (!safeSlug) {
       setStatus("Enter a code.");
@@ -67,7 +67,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
       if (!response.ok) throw new Error(data.error || "Load failed.");
 
       const hasLocalChanges = contentRef.current !== savedContentRef.current;
-      if (!quiet || !hasLocalChanges) {
+      if (!quiet || force || !hasLocalChanges) {
         setContent(data.content);
         setSavedContent(data.content);
       }
@@ -89,9 +89,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
   useEffect(() => {
     if (!autoRefresh || !loadedSlug) return;
     const timer = window.setInterval(() => {
-      if (contentRef.current === savedContentRef.current) {
-        void loadClip(loadedSlug, true);
-      }
+      void loadClip(loadedSlug, true, true);
     }, 5000);
 
     return () => window.clearInterval(timer);
@@ -168,6 +166,16 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
     }
   }
 
+  function refreshClip() {
+    const safeSlug = loadedSlug || normalizedSlug;
+    if (!safeSlug) {
+      setStatus("Open a code first.");
+      return;
+    }
+
+    void loadClip(safeSlug, false, true);
+  }
+
   function newClip() {
     const nextSlug = randomSlug();
     window.history.pushState(null, "", `/${nextSlug}`);
@@ -236,7 +244,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 onChange={(event) => setAutoRefresh(event.target.checked)}
                 className="h-4 w-4 accent-sky-400"
               />
-              Auto-refresh when you have no unsaved changes
+              Auto-refresh every 5 seconds
             </label>
 
             <div className="mt-5 text-sm text-slate-400">
@@ -254,6 +262,13 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 <p className="text-sm text-slate-400">Plain text whiteboard</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={refreshClip}
+                  className="rounded-md border border-white/15 px-4 py-2 text-sm font-bold text-slate-100 hover:bg-white/10"
+                >
+                  Refresh
+                </button>
                 <button
                   type="button"
                   onClick={copyLink}
