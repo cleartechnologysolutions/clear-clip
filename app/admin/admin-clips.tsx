@@ -13,6 +13,11 @@ type AdminResponse = {
   error?: string;
 };
 
+type AdminActionResponse = {
+  ok?: boolean;
+  error?: string;
+};
+
 export function AdminClips() {
   const [password, setPassword] = useState("");
   const [clips, setClips] = useState<AdminClip[]>([]);
@@ -46,6 +51,34 @@ export function AdminClips() {
       setStatus("Loaded.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Admin load failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function deleteAllClips() {
+    const confirmed = window.confirm("Delete every saved clipboard?");
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    setStatus("Deleting all clipboards...");
+
+    try {
+      const response = await fetch("/api/admin/clips", {
+        method: "DELETE",
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${password}`,
+        },
+      });
+      const data = (await response.json()) as AdminActionResponse;
+      if (!response.ok) throw new Error(data.error || "Delete failed.");
+
+      setClips([]);
+      setHasLoaded(true);
+      setStatus("Deleted all clipboards.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Delete failed.");
     } finally {
       setIsLoading(false);
     }
@@ -104,6 +137,15 @@ export function AdminClips() {
               <p className="mt-2 text-sm text-slate-200">{clipCount} clipboards</p>
               <p className="mt-1 text-sm text-slate-400">{totalCharacters.toLocaleString()} total characters</p>
             </div>
+
+            <button
+              type="button"
+              onClick={deleteAllClips}
+              disabled={!hasLoaded || clipCount === 0 || isLoading}
+              className="mt-3 h-11 w-full rounded-md border border-red-300/35 bg-red-500/10 px-4 text-sm font-bold text-red-100 hover:bg-red-500/20 disabled:opacity-50"
+            >
+              Delete all clipboards
+            </button>
 
             <p className="mt-5 text-sm text-slate-300">
               Status: <span className="text-slate-100">{status}</span>

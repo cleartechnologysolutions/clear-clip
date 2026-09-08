@@ -54,3 +54,26 @@ export async function GET(request: Request) {
     return Response.json({ error: routeError(error) }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const adminPassword = getAdminPassword();
+    if (!adminPassword) {
+      return Response.json(
+        { error: "Admin password is not configured." },
+        { status: 503 }
+      );
+    }
+
+    if (getBearerToken(request) !== adminPassword) {
+      return Response.json({ error: "Wrong password." }, { status: 401 });
+    }
+
+    const db = getDb();
+    await db.delete(clips);
+
+    return Response.json({ ok: true });
+  } catch (error) {
+    return Response.json({ error: routeError(error) }, { status: 500 });
+  }
+}
