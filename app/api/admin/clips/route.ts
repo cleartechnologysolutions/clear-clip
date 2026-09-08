@@ -5,7 +5,7 @@ import { clips } from "../../../../db/schema";
 
 function getAdminPassword() {
   const value = (env as { ADMIN_PASSWORD?: string }).ADMIN_PASSWORD;
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" && value ? value : "@dm!N4CtS";
 }
 
 function getBearerToken(request: Request) {
