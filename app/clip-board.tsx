@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { ClipSession } from "./clip-session";
 
 function cleanSlug(value: string) {
   return value
@@ -19,187 +20,100 @@ function randomSlug() {
   ).join("");
 }
 
-type ClipResponse = {
-  slug: string;
-  content: string;
-  updatedAt: string | null;
-  exists?: boolean;
-  error?: string;
-};
-
 export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
+  const sessionRef = useRef<ClipSession | null>(null);
+  if (!sessionRef.current) sessionRef.current = new ClipSession();
+  const session = sessionRef.current;
+  const [state, setState] = useState(session.state);
   const [slug, setSlug] = useState(initialSlug || "");
-  const [loadedSlug, setLoadedSlug] = useState("");
-  const [content, setContent] = useState("");
-  const [savedContent, setSavedContent] = useState("");
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  const [status, setStatus] = useState("Enter a code or make a new one.");
-  const [isSaving, setIsSaving] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const contentRef = useRef(content);
-  const savedContentRef = useRef(savedContent);
+  const [notice, setNotice] = useState("");
+  const loadedSlug = state.slug;
+  const content = state.content;
+  const updatedAt = state.updatedAt;
+  const status = notice || state.status;
+  const dirty = content !== state.savedContent;
+  const busy = state.busy !== null;
+  const writing = state.busy === "save" || state.busy === "clear";
+  const normalizedSlug = cleanSlug(slug);
+  const shareUrl = typeof window !== "undefined" && loadedSlug
+    ? window.location.origin + "/" + loadedSlug : "";
 
   useEffect(() => {
-    contentRef.current = content;
-  }, [content]);
-
-  useEffect(() => {
-    savedContentRef.current = savedContent;
-  }, [savedContent]);
-
-  const normalizedSlug = useMemo(() => cleanSlug(slug), [slug]);
-  const shareUrl = useMemo(() => {
-    if (typeof window === "undefined" || !normalizedSlug) return "";
-    return `${window.location.origin}/${normalizedSlug}`;
-  }, [normalizedSlug]);
-
-  const loadClip = useCallback(async (targetSlug: string, quiet = false, force = false) => {
-    const safeSlug = cleanSlug(targetSlug);
-    if (!safeSlug) {
-      setStatus("Enter a code.");
-      return;
-    }
-
-    try {
-      if (!quiet) setStatus("Loading...");
-      const response = await fetch(`/api/clips/${safeSlug}`, { cache: "no-store" });
-      const data = (await response.json()) as ClipResponse;
-      if (!response.ok) throw new Error(data.error || "Load failed.");
-
-      const hasLocalChanges = contentRef.current !== savedContentRef.current;
-      if (!quiet || force || !hasLocalChanges) {
-        setContent(data.content);
-        setSavedContent(data.content);
-      }
-      setLoadedSlug(data.slug);
-      setSlug(data.slug);
-      setUpdatedAt(data.updatedAt);
-      setStatus(data.exists ? "Loaded." : "New code. Type something and save it.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Load failed.");
-    }
-  }, []);
-
-  useEffect(() => {
-    const pathSlug = cleanSlug(window.location.pathname.replace(/^\/+/, ""));
-    const startingSlug = pathSlug || randomSlug();
-    void loadClip(startingSlug);
-  }, []);
-
-  useEffect(() => {
-    if (!autoRefresh || !loadedSlug) return;
-    const timer = window.setInterval(() => {
-      void loadClip(loadedSlug, true, true);
-    }, 5000);
-
-    return () => window.clearInterval(timer);
-  }, [autoRefresh, loadedSlug, loadClip]);
+    const unsubscribe = session.subscribe(setState);
+    try { session.setStorage(window.sessionStorage); }
+    catch { session.setStorage(null); }
+    const startingSlug = cleanSlug(initialSlug || window.location.pathname.replace(/^\/+/, "")) || randomSlug();
+    setSlug(startingSlug);
+    window.history.replaceState(null, "", "/" + startingSlug);
+    void session.open(startingSlug);
+    const onPopState = () => {
+      const target = cleanSlug(window.location.pathname.replace(/^\/+/, "")) || randomSlug();
+      setSlug(target);
+      setNotice("");
+      void session.open(target);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [session, initialSlug]);
 
   function openClip(event: FormEvent) {
     event.preventDefault();
-    const safeSlug = normalizedSlug || randomSlug();
-    window.history.pushState(null, "", `/${safeSlug}`);
-    void loadClip(safeSlug);
-  }
-
-  async function saveClip() {
-    const safeSlug = normalizedSlug || loadedSlug || randomSlug();
-    setIsSaving(true);
-    setStatus("Saving...");
-
-    try {
-      const response = await fetch(`/api/clips/${safeSlug}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      const data = (await response.json()) as ClipResponse;
-      if (!response.ok) throw new Error(data.error || "Save failed.");
-
-      setSlug(data.slug);
-      setLoadedSlug(data.slug);
-      setSavedContent(data.content);
-      setUpdatedAt(data.updatedAt);
-      window.history.pushState(null, "", `/${data.slug}`);
-      setStatus("Saved.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Save failed.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function clearClip() {
-    if (!loadedSlug && !normalizedSlug) {
-      setContent("");
-      return;
-    }
-
-    const safeSlug = loadedSlug || normalizedSlug;
-    setIsSaving(true);
-    setStatus("Clearing...");
-
-    try {
-      const response = await fetch(`/api/clips/${safeSlug}`, { method: "DELETE" });
-      const data = (await response.json()) as ClipResponse;
-      if (!response.ok) throw new Error(data.error || "Clear failed.");
-
-      setContent("");
-      setSavedContent("");
-      setUpdatedAt(data.updatedAt);
-      setStatus("Cleared.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Clear failed.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function copyLink() {
-    if (!shareUrl) return;
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setStatus("Link copied.");
-    } catch {
-      setStatus("Copy failed. Select the URL manually.");
-    }
-  }
-
-  function refreshClip() {
-    const safeSlug = loadedSlug || normalizedSlug;
-    if (!safeSlug) {
-      setStatus("Open a code first.");
-      return;
-    }
-
-    void loadClip(safeSlug, false, true);
+    if (writing) return;
+    const target = normalizedSlug || randomSlug();
+    setSlug(target);
+    setNotice("");
+    window.history.pushState(null, "", "/" + target);
+    void session.open(target);
   }
 
   function newClip() {
-    const nextSlug = randomSlug();
-    window.history.pushState(null, "", `/${nextSlug}`);
-    void loadClip(nextSlug);
+    if (writing) return;
+    const target = randomSlug();
+    setSlug(target);
+    setNotice("");
+    window.history.pushState(null, "", "/" + target);
+    void session.open(target);
   }
 
-  const dirty = content !== savedContent;
+  function refreshClip() {
+    setNotice("");
+    void session.refresh();
+  }
+
+  function saveClip() {
+    setNotice("");
+    void session.save();
+  }
+
+  function clearClip() {
+    setNotice("");
+    void session.clear();
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setNotice("Link copied.");
+    } catch { setNotice("Copy failed. Select the URL manually."); }
+  }
 
   return (
     <main className="min-h-screen bg-[#06111f] px-4 py-5 text-slate-50 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[.04] px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-lg border border-white/60 bg-sky-400/15 text-sm font-black tracking-[.08em]">
-              CTS
-            </div>
             <div>
-              <p className="text-base font-black">Clear Technology Solutions</p>
-              <p className="text-sm text-slate-400">Shared clipboards</p>
+              <p className="text-base font-black">Clip</p>
+              <p className="text-sm text-slate-400">Shared clipboards · Build 10</p>
             </div>
           </div>
           <button
             type="button"
             onClick={newClip}
+            disabled={writing}
             className="rounded-md border border-sky-300/40 bg-sky-300/10 px-4 py-2 text-sm font-bold text-sky-100 hover:bg-sky-300/20"
           >
             New code
@@ -226,6 +140,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
               />
               <button
                 type="submit"
+                disabled={writing}
                 className="h-11 w-full rounded-md bg-sky-400 px-4 text-sm font-black text-slate-950 hover:bg-sky-300"
               >
                 Open
@@ -237,18 +152,15 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
               <p className="mt-2 break-all text-sm text-slate-200">{shareUrl || "Open a code first."}</p>
             </div>
 
-            <label className="mt-5 flex items-center gap-3 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(event) => setAutoRefresh(event.target.checked)}
-                className="h-4 w-4 accent-sky-400"
-              />
-              Auto-refresh every 5 seconds
-            </label>
+            <p className="mt-5 text-sm leading-6 text-slate-300">
+              Press Save to share your text. Press Refresh to see the other person&apos;s saved updates.
+              Refresh keeps your unsaved text.
+            </p>
 
             <div className="mt-5 text-sm text-slate-400">
-              <p>Status: <span className="text-slate-100">{dirty ? "Unsaved changes" : status}</span></p>
+              <p role="status">Status: <span className="text-slate-100">{status}</span></p>
+              {dirty ? <p className="mt-1 text-amber-200">Unsaved changes</p> : null}
+              {state.storageWarning ? <p className="mt-1 text-amber-200">{state.storageWarning}</p> : null}
               {updatedAt ? <p className="mt-1">Last saved: {new Date(updatedAt).toLocaleString()}</p> : null}
             </div>
           </aside>
@@ -265,9 +177,10 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 <button
                   type="button"
                   onClick={refreshClip}
+                  disabled={busy || !loadedSlug}
                   className="rounded-md border border-white/15 px-4 py-2 text-sm font-bold text-slate-100 hover:bg-white/10"
                 >
-                  Refresh
+                  {state.busy === "load" ? "Refreshing..." : "Refresh"}
                 </button>
                 <button
                   type="button"
@@ -279,7 +192,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 <button
                   type="button"
                   onClick={clearClip}
-                  disabled={isSaving}
+                  disabled={busy || !state.loaded}
                   className="rounded-md border border-red-300/30 px-4 py-2 text-sm font-bold text-red-100 hover:bg-red-400/10 disabled:opacity-60"
                 >
                   Clear
@@ -287,21 +200,38 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 <button
                   type="button"
                   onClick={saveClip}
-                  disabled={isSaving}
+                  disabled={busy || !state.loaded}
                   className="rounded-md bg-white px-5 py-2 text-sm font-black text-slate-950 hover:bg-sky-100 disabled:opacity-60"
                 >
-                  {isSaving ? "Saving" : "Save"}
+                  {state.busy === "save" ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>
 
             <textarea
+              aria-label="Your clipboard text"
               value={content}
-              onChange={(event) => setContent(event.target.value)}
+              disabled={writing}
+              onChange={(event) => { setNotice(""); session.edit(event.target.value); }}
               placeholder="Paste notes, commands, config snippets, meeting notes, or whatever you need to pull up somewhere else."
               className="min-h-[520px] flex-1 resize-none rounded-b-lg border-0 bg-slate-950/55 p-5 font-mono text-base leading-7 text-slate-50 outline-none placeholder:text-slate-500"
               spellCheck={false}
             />
+            {state.remote ? (
+              <div className="border-t border-sky-300/30 bg-sky-300/5 p-4">
+                <h2 className="text-sm font-bold text-sky-100">Latest saved text</h2>
+                <p className="mt-1 text-sm text-slate-300">
+                  Your text above was kept. Copy anything you need from this version into your draft, then Save.
+                </p>
+                <textarea
+                  aria-label="Latest saved text"
+                  readOnly
+                  value={state.remote.content}
+                  placeholder="The shared clipboard is empty. Your text above has been kept."
+                  className="mt-3 min-h-40 w-full rounded-md border border-white/15 bg-slate-950/60 p-3 font-mono text-sm text-slate-100"
+                />
+              </div>
+            ) : null}
           </section>
         </section>
       </div>

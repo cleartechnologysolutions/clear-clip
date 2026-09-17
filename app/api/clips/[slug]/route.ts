@@ -41,7 +41,7 @@ export async function GET(
       content: clip?.content ?? "",
       updatedAt: clip?.updatedAt?.toISOString() ?? null,
       exists: Boolean(clip),
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: routeError(error) }, { status: 500 });
   }

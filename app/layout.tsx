@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clear Technology Solutions Clipboard",
-  description: "A simple shared clipboard and text whiteboard from Clear Technology Solutions.",
+  title: "Clip | Shared Clipboard",
+  description: "A simple shared clipboard and text whiteboard.",
   other: {
     "codex-preview": "development",
   },

@@ -89,12 +89,9 @@ export function AdminClips() {
       <div className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[.04] px-4 py-3">
           <a href="/" className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-lg border border-white/60 bg-sky-400/15 text-sm font-black tracking-[.08em]">
-              CTS
-            </div>
             <div>
-              <p className="text-base font-black">Clear Technology Solutions</p>
-              <p className="text-sm text-slate-400">Clipboard admin</p>
+              <p className="text-base font-black">Clip</p>
+              <p className="text-sm text-slate-400">Clipboard admin · Build 10</p>
             </div>
           </a>
           <a
