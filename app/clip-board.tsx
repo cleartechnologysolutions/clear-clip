@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { ClipImage } from "./clip-image";
 import { ClipSession } from "./clip-session";
 
 function cleanSlug(value: string) {
@@ -26,14 +27,16 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
   const session = sessionRef.current;
   const [state, setState] = useState(session.state);
   const [slug, setSlug] = useState(initialSlug || "");
+  const [imageRevision, setImageRevision] = useState(0);
+  const [imageBusy, setImageBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const loadedSlug = state.slug;
   const content = state.content;
   const updatedAt = state.updatedAt;
   const status = notice || state.status;
   const dirty = content !== state.savedContent;
-  const busy = state.busy !== null;
-  const writing = state.busy === "save" || state.busy === "clear";
+  const busy = state.busy !== null || imageBusy;
+  const writing = state.busy === "save" || state.busy === "clear" || imageBusy;
   const normalizedSlug = cleanSlug(slug);
   const shareUrl = typeof window !== "undefined" && loadedSlug
     ? window.location.origin + "/" + loadedSlug : "";
@@ -81,6 +84,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
   function refreshClip() {
     setNotice("");
     void session.refresh();
+    setImageRevision(value => value + 1);
   }
 
   function saveClip() {
@@ -90,7 +94,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
 
   function clearClip() {
     setNotice("");
-    void session.clear();
+    void session.clear().then(() => setImageRevision(value => value + 1));
   }
 
   async function copyLink() {
@@ -107,7 +111,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
           <div className="flex items-center gap-3">
             <div>
               <p className="text-base font-black">Clip</p>
-              <p className="text-sm text-slate-400">Shared clipboards · Build 10</p>
+              <p className="text-sm text-slate-400">Shared clipboards · Build 11</p>
             </div>
           </div>
           <button
@@ -171,7 +175,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
                 <p className="text-sm font-bold uppercase tracking-[.14em] text-sky-200">
                   /{loadedSlug || normalizedSlug || "new"}
                 </p>
-                <p className="text-sm text-slate-400">Plain text whiteboard</p>
+                <p className="text-sm text-slate-400">Text and screenshots</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -217,6 +221,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
               className="min-h-[520px] flex-1 resize-none rounded-b-lg border-0 bg-slate-950/55 p-5 font-mono text-base leading-7 text-slate-50 outline-none placeholder:text-slate-500"
               spellCheck={false}
             />
+            {loadedSlug && <ClipImage key={loadedSlug} slug={loadedSlug} revision={imageRevision} disabled={state.busy !== null} onBusy={setImageBusy} />}
             {state.remote ? (
               <div className="border-t border-sky-300/30 bg-sky-300/5 p-4">
                 <h2 className="text-sm font-bold text-sky-100">Latest saved text</h2>

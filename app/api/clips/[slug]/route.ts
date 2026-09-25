@@ -1,3 +1,4 @@
+import { clearImage } from "../../../clip-images";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { clips } from "../../../../db/schema";
@@ -97,6 +98,7 @@ export async function DELETE(
       return Response.json({ error: "Clipboard name is required." }, { status: 400 });
     }
 
+    await clearImage(slug);
     const db = getDb();
     const updatedAt = new Date();
 

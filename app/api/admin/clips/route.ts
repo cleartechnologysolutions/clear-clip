@@ -1,3 +1,4 @@
+import { clearAllImages } from "../../../clip-images";
 import { desc } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../../db";
@@ -70,6 +71,7 @@ export async function DELETE(request: Request) {
     }
 
     const db = getDb();
+    await clearAllImages();
     await db.delete(clips);
 
     return Response.json({ ok: true });

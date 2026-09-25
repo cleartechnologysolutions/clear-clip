@@ -6,7 +6,7 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "77d2043c-a133-4c6a-8a84-62f3de23e30e";
 
 const d1 = "DB";
-const r2 = null;
+const r2 = "CLIP_IMAGES";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -27,7 +27,7 @@ const localBindingConfig = {
     ? [
         {
           binding: r2,
-          bucket_name: "site-creator-r2",
+          bucket_name: "clip-images",
         },
       ]
     : [],

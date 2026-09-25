@@ -1,6 +1,8 @@
-# Clip — Build 10
+# Clip — Build 11
 
-Shared text clipboards with a separate URL for each code.
+Shared text and image clipboards with a separate URL for each code.
+
+**Image setup: read IMAGE-SETUP.md before deploying.** Create the private R2 bucket `clip-images` and its one-day expiration rule. Images are shared immediately; text uses Save.
 
 ## Changes
 
@@ -27,7 +29,7 @@ Shared text clipboards with a separate URL for each code.
 4. Keep the deploy command: `npx wrangler deploy`
 5. After deployment, reload each open Clip page once to load the new code.
    Copy any unsaved text somewhere safe before that first reload from the old app.
-   The new page reads `Shared clipboards · Build 10`.
+   The new page reads `Shared clipboards · Build 11`.
 
 The database settings in vite.config.ts retain the previous package's defaults.
 If you customized those values in your repository, keep your current values.
@@ -39,3 +41,5 @@ with unsaved edits, browser reload draft recovery, empty remote boards, delayed
 responses, failed reads, code switching, and explicit clearing. Use Node 24.
 
 `npm run build` produces the Cloudflare Worker and browser assets.
+
+After building, `node tests/images.integration.mjs` checks local D1/R2 uploads, size limits, text preservation, removal, clearing and authenticated admin deletion.
