@@ -111,7 +111,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
           <div className="flex items-center gap-3">
             <div>
               <p className="text-base font-black">Clip</p>
-              <p className="text-sm text-slate-400">Shared clipboards · Build 11</p>
+              <p className="text-sm text-slate-400">Shared clipboards · Build 12</p>
             </div>
           </div>
           <button

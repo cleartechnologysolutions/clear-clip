@@ -1,7 +1,8 @@
 import { env } from 'cloudflare:workers';
-export const imageKey = (slug: string) => `clips/${slug}`;
+export const imageKey = (slug: string, slot = 0) => slot === 0 ? `clips/${slug}` : `clips/${slug}/${slot}`;
+export const IMAGE_SLOTS = [0, 1, 2, 3, 4];
 export function imageBucket() { return (env as unknown as { CLIP_IMAGES?: R2Bucket }).CLIP_IMAGES; }
-export async function clearImage(slug: string) { await imageBucket()?.delete(imageKey(slug)); }
+export async function clearImage(slug: string) { await imageBucket()?.delete(IMAGE_SLOTS.map(slot => imageKey(slug, slot))); }
 export async function clearAllImages() {
   const bucket = imageBucket();
   if (!bucket) return;

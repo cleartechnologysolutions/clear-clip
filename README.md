@@ -1,4 +1,4 @@
-# Clip — Build 11
+# Clip — Build 12
 
 Shared text and image clipboards with a separate URL for each code.
 
@@ -29,7 +29,7 @@ Shared text and image clipboards with a separate URL for each code.
 4. Keep the deploy command: `npx wrangler deploy`
 5. After deployment, reload each open Clip page once to load the new code.
    Copy any unsaved text somewhere safe before that first reload from the old app.
-   The new page reads `Shared clipboards · Build 11`.
+   The new page reads `Shared clipboards · Build 12`.
 
 The database settings in vite.config.ts retain the previous package's defaults.
 If you customized those values in your repository, keep your current values.
