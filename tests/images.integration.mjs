@@ -27,4 +27,20 @@ assert.equal((await fetch(base+'/image')).status,200);
 const cleared = await fetch('http://localhost/api/admin/clips',{method:'DELETE',headers:{Authorization:'Bearer local-test-only'}}); assert.equal(cleared.status,200);
 assert.equal((await fetch(base+'/image')).status,404);
 console.log('PASS: authenticated admin deletion includes images');
+// Racing requests must claim distinct slots rather than overwrite one another.
+const replies = await Promise.all(Array.from({length:8}, (_,i) => fetch(base+'/image', {method:'PUT',body:Buffer.concat([png,Buffer.from([i])])})));
+assert.equal(replies.filter(r=>r.status===200).length,5);
+assert.equal(replies.filter(r=>r.status===409).length,3);
+let list = await (await fetch(base+'/image?list=1')).json(); assert.equal(list.images.length,5);
+const stored = await Promise.all(list.images.map(async item => Buffer.from(await (await fetch(base+'/image?slot='+item.slot)).arrayBuffer()).at(-1)));
+assert.equal(new Set(stored).size,5);
+await fetch(base+'/image?slot=2',{method:'DELETE'});
+list = await (await fetch(base+'/image?list=1')).json(); assert.equal(list.images.length,4);
+assert.equal((await fetch(base+'/image',{method:'PUT',body:png})).status,200);
+await fetch(base,{method:'DELETE'});
+assert.equal((await (await fetch(base+'/image?list=1')).json()).images.length,0);
+// Build 11 screenshots use the root key, retained as slot zero.
+const bucket=await mf.getR2Bucket('CLIP_IMAGES');await bucket.put('clips/legacy',png,{httpMetadata:{contentType:'image/png'}});
+assert.equal((await (await fetch('http://localhost/api/clips/legacy/image?list=1')).json()).images.length,1);
+console.log('PASS: five-image limit under contention, distinct bytes, individual remove, slot reuse, clear all, legacy compatibility');
 await mf.dispose();
