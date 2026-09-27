@@ -1,3 +1,4 @@
+import {ensureClipOrigins} from "../../../clip-origin";
 import { clearAllImages } from "../../../clip-images";
 import { desc } from "drizzle-orm";
 import { env } from "cloudflare:workers";
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
       return Response.json({ error: "Wrong password." }, { status: 401 });
     }
 
+    await ensureClipOrigins();
     const db = getDb();
     const rows = await db
       .select()
@@ -44,13 +46,16 @@ export async function GET(request: Request) {
       .orderBy(desc(clips.updatedAt))
       .limit(200);
 
+    const origins=await env.DB.prepare('SELECT o.slug,o.public_ip FROM clip_origins o JOIN (SELECT slug FROM clips ORDER BY updated_at DESC LIMIT 200) c ON c.slug=o.slug').all<{slug:string;public_ip:string|null}>();
+    const ips=new Map(origins.results.map(row=>[row.slug,row.public_ip]));
     return Response.json({
       clips: rows.map((clip) => ({
         slug: clip.slug,
+        publicIp: ips.get(clip.slug) ?? null,
         content: clip.content,
         updatedAt: clip.updatedAt.toISOString(),
       })),
-    });
+    }, {headers:{"Cache-Control":"no-store"}});
   } catch (error) {
     return Response.json({ error: routeError(error) }, { status: 500 });
   }
@@ -70,9 +75,10 @@ export async function DELETE(request: Request) {
       return Response.json({ error: "Wrong password." }, { status: 401 });
     }
 
+    await ensureClipOrigins();
     const db = getDb();
     await clearAllImages();
-    await db.delete(clips);
+    await env.DB.batch([env.DB.prepare('DELETE FROM clips'),env.DB.prepare('DELETE FROM clip_origins')]);
 
     return Response.json({ ok: true });
   } catch (error) {

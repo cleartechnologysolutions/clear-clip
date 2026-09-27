@@ -1,3 +1,11 @@
+# Build 13: clipboard creator IP
+
+Admin shows **Created from IP** for clipboards first saved/created after this upgrade, including image-first clipboards. Existing boards show **Not recorded**, even when subsequently edited. The first creator IP is preserved when the board is edited or cleared. Admin Delete all also removes the saved IP metadata. A reused code after deletion records its new creator.
+
+The public page displays **Your public IP** for the current visitor and explains that it is recorded when creating a clipboard. This endpoint returns only the requesting visitor's IP and is not cached. The saved creator IP is exposed only through the authenticated admin API, never public clipboard responses.
+
+Uses Cloudflare's CF-Connecting-IP header, supports IPv4 and IPv6, and does not trust request body fields or X-Forwarded-For. A VPN/proxy address may appear. The metadata table is created automatically; upload and redeploy, with no manual SQL or new settings.
+
 # Clip — Build 12
 
 Shared text and image clipboards with a separate URL for each code.

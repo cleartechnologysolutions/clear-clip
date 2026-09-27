@@ -1,3 +1,4 @@
+import {saveClip} from "../../../../clip-origin";
 import { getDb } from "../../../../../db";
 import { clips } from "../../../../../db/schema";
 import { imageBucket, imageKey, IMAGE_SLOTS } from '../../../../clip-images';
@@ -44,7 +45,7 @@ async function handle(request: Request, context: Context) {
     : ['GIF87a', 'GIF89a'].includes(ascii(0, 6)) ? 'image/gif'
     : ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP' ? 'image/webp' : null;
   if (!type) return json({ error: 'Use a PNG, JPEG, WebP, or GIF image.' }, 415);
-  await getDb().insert(clips).values({ slug, content: "", updatedAt: new Date() }).onConflictDoNothing();
+  await saveClip(request,slug,"",new Date(),true);
   // Fixed slots plus conditional writes enforce the limit even for simultaneous uploads.
   // Slot zero retains the original Build 11 key, so existing screenshots remain visible.
   for (const slot of IMAGE_SLOTS) {

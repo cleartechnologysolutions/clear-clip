@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 
 type AdminClip = {
   slug: string;
+  publicIp?: string | null;
   content: string;
   updatedAt: string;
 };
@@ -91,7 +92,7 @@ export function AdminClips() {
           <a href="/" className="flex items-center gap-3">
             <div>
               <p className="text-base font-black">Clip</p>
-              <p className="text-sm text-slate-400">Clipboard admin · Build 10</p>
+              <p className="text-sm text-slate-400">Clipboard admin · Build 13</p>
             </div>
           </a>
           <a
@@ -170,6 +171,7 @@ export function AdminClips() {
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(clip.updatedAt).toLocaleString()}
                       </p>
+                      <p className="mt-2 break-all text-xs text-slate-300">Created from IP: <span className="font-mono select-all">{clip.publicIp || "Not recorded"}</span></p>
                     </div>
                     <p className="max-h-24 overflow-hidden whitespace-pre-wrap break-words font-mono text-sm leading-6 text-slate-300">
                       {clip.content || "(empty)"}

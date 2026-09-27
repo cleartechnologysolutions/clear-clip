@@ -22,6 +22,15 @@ function randomSlug() {
 }
 
 export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
+  const [publicIp,setPublicIp] = useState('Checking…');
+  useEffect(()=>{
+    const controller=new AbortController();
+    fetch('/api/public-ip',{cache:'no-store',signal:controller.signal})
+      .then(async response=>{if(!response.ok)throw new Error();return response.json() as Promise<{publicIp:string|null}>;})
+      .then(data=>setPublicIp(data.publicIp || 'Unavailable'))
+      .catch(()=>{if(!controller.signal.aborted)setPublicIp('Unavailable');});
+    return()=>controller.abort();
+  },[]);
   const sessionRef = useRef<ClipSession | null>(null);
   if (!sessionRef.current) sessionRef.current = new ClipSession();
   const session = sessionRef.current;
@@ -111,7 +120,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
           <div className="flex items-center gap-3">
             <div>
               <p className="text-base font-black">Clip</p>
-              <p className="text-sm text-slate-400">Shared clipboards · Build 12</p>
+              <p className="text-sm text-slate-400">Shared clipboards · Build 13</p>
             </div>
           </div>
           <button
@@ -161,6 +170,10 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
               Refresh keeps your unsaved text.
             </p>
 
+            <div className="mt-5 rounded-md border border-amber-300/30 bg-amber-300/5 p-3">
+              <p className="text-sm font-bold text-slate-100">Your public IP: <span className="break-all font-mono select-all">{publicIp}</span></p>
+              <p className="mt-2 text-xs leading-5 text-slate-300">Your IP address is recorded when you create a clipboard to help prevent abuse. It is visible to the administrator.</p>
+            </div>
             <div className="mt-5 text-sm text-slate-400">
               <p role="status">Status: <span className="text-slate-100">{status}</span></p>
               {dirty ? <p className="mt-1 text-amber-200">Unsaved changes</p> : null}

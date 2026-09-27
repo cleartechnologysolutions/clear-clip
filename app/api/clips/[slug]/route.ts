@@ -1,3 +1,4 @@
+import {saveClip} from "../../../clip-origin";
 import { clearImage } from "../../../clip-images";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
@@ -24,7 +25,7 @@ function routeError(error: unknown) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> }
 ) {
   try {
@@ -69,13 +70,7 @@ export async function PUT(
     const db = getDb();
     const updatedAt = new Date();
 
-    await db
-      .insert(clips)
-      .values({ slug, content, updatedAt })
-      .onConflictDoUpdate({
-        target: clips.slug,
-        set: { content, updatedAt },
-      });
+    await saveClip(request,slug,content,updatedAt);
 
     return Response.json({
       slug,
@@ -88,7 +83,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> }
 ) {
   try {
@@ -102,13 +97,7 @@ export async function DELETE(
     const db = getDb();
     const updatedAt = new Date();
 
-    await db
-      .insert(clips)
-      .values({ slug, content: "", updatedAt })
-      .onConflictDoUpdate({
-        target: clips.slug,
-        set: { content: "", updatedAt },
-      });
+    await saveClip(request,slug,"",updatedAt);
 
     return Response.json({
       slug,
