@@ -1,7 +1,9 @@
+import {authSchema,configure,hashToken,randomToken,validSession,login,sessionToken,cookieName,equal,type Security} from "./history-auth";
 import {authorized} from '../app/admin-auth';
 type Env={DB:D1Database;CLIP_IMAGES?:R2Bucket};
 let ready:Promise<unknown>|undefined;
 function setup(db:D1Database){return ready??=db.batch([
+ ...authSchema(db),
  db.prepare('CREATE TABLE IF NOT EXISTS history_boards(slug TEXT PRIMARY KEY,next_number INTEGER NOT NULL DEFAULT 1,created_at INTEGER NOT NULL)'),
  db.prepare('CREATE TABLE IF NOT EXISTS history_entries(board TEXT NOT NULL,number INTEGER NOT NULL,content TEXT,image_key TEXT,media_type TEXT,digest TEXT NOT NULL,request_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(board,number),UNIQUE(board,request_id))'),
  db.prepare('CREATE TRIGGER IF NOT EXISTS history_number AFTER INSERT ON history_entries BEGIN UPDATE history_boards SET next_number=next_number+1 WHERE slug=NEW.board; END')
@@ -19,23 +21,51 @@ export async function history(request:Request,env:Env):Promise<Response>{
  try{
  await setup(env.DB);
  if(admin){
-  if(request.method==='GET')return json({boards:(await env.DB.prepare('SELECT slug,next_number,created_at FROM history_boards ORDER BY created_at DESC').all()).results});
+  if(request.method==='GET')return json({boards:(await env.DB.prepare('SELECT b.slug,b.next_number,b.created_at,s.board IS NOT NULL AS secured FROM history_boards b LEFT JOIN history_security s ON s.board=b.slug ORDER BY b.created_at DESC').all()).results});
   const body=JSON.parse(new TextDecoder().decode(await bodyBytes(request,2048)));const slug=String(body.slug||'').trim().toLowerCase();
   if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||slug.length>60)return json({error:'Use 1–60 lowercase letters, numbers or hyphens.'},400);
   if(request.method==='POST'){
+   if(typeof body.password!=='string'||body.password.length<12||body.password.length>200)return json({error:'Use a board password between 12 and 200 characters.'},400);
    const r=await env.DB.prepare('INSERT OR IGNORE INTO history_boards(slug,created_at) VALUES(?,?)').bind(slug,Date.now()).run();
-   return r.meta.changes?json({ok:true,slug},201):json({error:'That history board already exists.'},409);
+   if(!r.meta.changes)return json({error:'That history board already exists.'},409);
+   const uploadKey=await configure(env.DB,slug,body.password);return json({ok:true,slug,uploadKey},201);
+  }
+  if(request.method==='PATCH'){
+   if(!await env.DB.prepare('SELECT slug FROM history_boards WHERE slug=?').bind(slug).first())return json({error:'Board not found.'},404);
+   if(body.action==='rotate-key'){
+    const uploadKey=randomToken();const r=await env.DB.prepare('UPDATE history_security SET upload_hash=? WHERE board=?').bind(await hashToken(uploadKey),slug).run();
+    return r.meta.changes?json({ok:true,uploadKey}):json({error:'Set a board password first.'},400);
+   }
+   if(typeof body.password!=='string'||body.password.length<12||body.password.length>200)return json({error:'Use a board password between 12 and 200 characters.'},400);
+   const uploadKey=await configure(env.DB,slug,body.password);return json({ok:true,uploadKey});
   }
   if(request.method==='DELETE'){
-   const results=await env.DB.batch([env.DB.prepare('DELETE FROM history_boards WHERE slug=?').bind(slug),env.DB.prepare('DELETE FROM history_entries WHERE board=? RETURNING image_key').bind(slug)]);
+   const results=await env.DB.batch([env.DB.prepare('DELETE FROM history_boards WHERE slug=?').bind(slug),env.DB.prepare('DELETE FROM history_entries WHERE board=? RETURNING image_key').bind(slug),env.DB.prepare('DELETE FROM history_security WHERE board=?').bind(slug),env.DB.prepare('DELETE FROM history_sessions WHERE board=?').bind(slug)]);
    const keys=results[1].results.map((r:any)=>r.image_key).filter(Boolean);if(keys.length)await env.CLIP_IMAGES?.delete(keys);
    return json({ok:true});
   }
   return json({error:'Method not allowed'},405);
  }
- const match=url.pathname.match(/^\/api\/history\/([a-z0-9-]{1,60})(?:\/images\/([0-9]+))?$/);
- if(!match)return json({error:'Not found'},404);const [,slug,image]=match;
+ const match=url.pathname.match(/^\/api\/history\/([a-z0-9-]{1,60})(?:\/images\/([0-9]+)|\/(login|logout))?$/);
+ if(!match)return json({error:'Not found'},404);const [,slug,image,action]=match;
  if(!await env.DB.prepare('SELECT slug FROM history_boards WHERE slug=?').bind(slug).first())return json({error:'History board not found. Ask the admin to create it first.'},404);
+ const security=await env.DB.prepare('SELECT * FROM history_security WHERE board=?').bind(slug).first<Security>();
+ if(!security)return json({error:'This board is locked until its admin sets a password.',locked:true},423);
+ if(action==='login'){
+  if(request.method!=='POST')return json({error:'Method not allowed'},405);
+  const data=JSON.parse(new TextDecoder().decode(await bodyBytes(request,2048)));
+  if(typeof data.password!=='string'||data.password.length>200)return json({error:'Invalid password.'},400);
+  return login(env.DB,request,security,data.password);
+ }
+ if(action==='logout'){
+  if(request.method!=='POST')return json({error:'Method not allowed'},405);
+  await env.DB.prepare('DELETE FROM history_sessions WHERE token_hash=? AND board=?').bind(await hashToken(sessionToken(request,slug)),slug).run();
+  return Response.json({ok:true},{headers:{'Cache-Control':'no-store','Set-Cookie':`${cookieName(slug)}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`}});
+ }
+ if(request.method==='POST'&&!image){
+  const key=request.headers.get('Authorization')?.replace(/^Bearer /,'')||'';
+  if(!/^[a-f0-9]{64}$/.test(key)||!equal(await hashToken(key),security.upload_hash))return json({error:'Invalid upload key. Set the board upload key in Clip Tray.'},401);
+ }else if(!await validSession(env.DB,request,security))return json({error:'Unlock this board to view its history.',locked:true},401);
  if(image){
   if(request.method!=='GET')return json({error:'Method not allowed'},405);
   const row=await env.DB.prepare('SELECT image_key FROM history_entries WHERE board=? AND number=?').bind(slug,Number(image)).first<{image_key:string}>();
