@@ -1,20 +1,10 @@
+import {getAdminPassword,getBearerToken} from "../../../admin-auth";
 import {ensureClipOrigins} from "../../../clip-origin";
 import { clearAllImages } from "../../../clip-images";
 import { desc } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../../db";
 import { clips } from "../../../../db/schema";
-
-function getAdminPassword() {
-  const value = (env as { ADMIN_PASSWORD?: string }).ADMIN_PASSWORD;
-  return typeof value === "string" && value ? value : "@dm!N4CtS";
-}
-
-function getBearerToken(request: Request) {
-  const authorization = request.headers.get("authorization") || "";
-  const [scheme, token] = authorization.split(" ");
-  return scheme?.toLowerCase() === "bearer" ? token || "" : "";
-}
 
 function routeError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error";

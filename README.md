@@ -51,3 +51,12 @@ responses, failed reads, code switching, and explicit clearing. Use Node 24.
 `npm run build` produces the Cloudflare Worker and browser assets.
 
 After building, `node tests/images.integration.mjs` checks local D1/R2 uploads, size limits, text preservation, removal, clearing and authenticated admin deletion.
+
+## Build 14 — Windows Clip Tray live receiving
+
+Deploy normally using the existing D1 and CLIP_IMAGES bindings. No schema change.
+Links ending in `?live=1` refresh text and screenshots every 2.5 seconds while
+visible. Unsaved drafts remain protected by ClipSession. Normal links retain
+manual Refresh. Use Stop live view to return to manual mode. Switching to a new
+board also turns live mode off. Clipboard uploads from Clip Tray use the existing
+PUT text and raw-image APIs. See the separate Clip Tray Windows ZIP for the app.

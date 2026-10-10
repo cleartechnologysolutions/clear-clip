@@ -39,6 +39,19 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
   const [imageRevision, setImageRevision] = useState(0);
   const [imageBusy, setImageBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [live, setLive] = useState(false);
+  useEffect(() => { setLive(new URLSearchParams(window.location.search).get("live") === "1"); }, []);
+  const imageBusyRef = useRef(false);
+  imageBusyRef.current = imageBusy;
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || imageBusyRef.current || session.state.busy || !session.state.loaded) return;
+      void session.refresh(true);
+      setImageRevision(value => value + 1);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [live, session]);
   const loadedSlug = state.slug;
   const content = state.content;
   const updatedAt = state.updatedAt;
@@ -48,7 +61,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
   const writing = state.busy === "save" || state.busy === "clear" || imageBusy;
   const normalizedSlug = cleanSlug(slug);
   const shareUrl = typeof window !== "undefined" && loadedSlug
-    ? window.location.origin + "/" + loadedSlug : "";
+    ? window.location.origin + "/" + loadedSlug + (live ? "?live=1" : "") : "";
 
   useEffect(() => {
     const unsubscribe = session.subscribe(setState);
@@ -56,9 +69,10 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
     catch { session.setStorage(null); }
     const startingSlug = cleanSlug(initialSlug || window.location.pathname.replace(/^\/+/, "")) || randomSlug();
     setSlug(startingSlug);
-    window.history.replaceState(null, "", "/" + startingSlug);
+    window.history.replaceState(null, "", "/" + startingSlug + (new URLSearchParams(window.location.search).get("live") === "1" ? "?live=1" : ""));
     void session.open(startingSlug);
     const onPopState = () => {
+      setLive(new URLSearchParams(window.location.search).get("live") === "1");
       const target = cleanSlug(window.location.pathname.replace(/^\/+/, "")) || randomSlug();
       setSlug(target);
       setNotice("");
@@ -77,6 +91,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
     const target = normalizedSlug || randomSlug();
     setSlug(target);
     setNotice("");
+    setLive(false);
     window.history.pushState(null, "", "/" + target);
     void session.open(target);
   }
@@ -86,6 +101,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
     const target = randomSlug();
     setSlug(target);
     setNotice("");
+    setLive(false);
     window.history.pushState(null, "", "/" + target);
     void session.open(target);
   }
@@ -120,7 +136,7 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
           <div className="flex items-center gap-3">
             <div>
               <p className="text-base font-black">Clip</p>
-              <p className="text-sm text-slate-400">Shared clipboards · Build 13</p>
+              <p className="text-sm text-slate-400">Shared clipboards · Build 15</p>
             </div>
           </div>
           <button
@@ -165,6 +181,11 @@ export function ClipBoard({ initialSlug }: { initialSlug?: string }) {
               <p className="mt-2 break-all text-sm text-slate-200">{shareUrl || "Open a code first."}</p>
             </div>
 
+            {live && <div className="mt-5 rounded border border-sky-300/40 bg-sky-300/10 p-3">
+              <p className="font-bold text-sky-100">Live view is on</p>
+              <p className="mt-1 text-sm">Checks for updates every 2.5 seconds while this tab is visible. Unsaved text is kept.</p>
+              <button className="mt-2 rounded border border-white/30 px-3 py-1 text-sm" onClick={() => { setLive(false); window.history.replaceState(null, "", "/" + loadedSlug); }}>Stop live view</button>
+            </div>}
             <p className="mt-5 text-sm leading-6 text-slate-300">
               Press Save to share your text. Press Refresh to see the other person&apos;s saved updates.
               Refresh keeps your unsaved text.

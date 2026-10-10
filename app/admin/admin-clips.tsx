@@ -1,5 +1,6 @@
 "use client";
 
+import {HistoryAdmin} from "./history-admin";
 import { FormEvent, useMemo, useState } from "react";
 
 type AdminClip = {
@@ -156,6 +157,7 @@ export function AdminClips() {
               <p className="mt-1 text-sm text-slate-400">Newest updates appear first.</p>
             </div>
 
+            {hasLoaded && <HistoryAdmin password={password}/>}
             {!hasLoaded ? (
               <div className="p-5 text-sm text-slate-400">Unlock admin view to list saved clipboards.</div>
             ) : clips.length === 0 ? (

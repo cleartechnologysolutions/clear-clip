@@ -125,14 +125,14 @@ export class ClipSession {
     this.persist();
   }
 
-  async refresh() {
+  async refresh(quiet = false) {
     if (!this.state.slug || this.state.busy === "save" || this.state.busy === "clear") return;
     const slug = this.state.slug;
     const id = ++this.requestId;
-    this.update({ busy: "load", status: "Checking for updates..." });
+    this.update(quiet ? { busy: "load" } : { busy: "load", status: "Checking for updates..." });
     try {
       const response = await this.fetcher("/api/clips/" + slug, { method: "GET", cache: "no-store" });
-      const body = await response.json();
+      const body = await response.json() as {error?:string};
       if (id !== this.requestId) return;
       if (!response.ok) throw new Error(body.error || "Refresh failed. Your text was kept.");
       this.receive(snapshot(body, slug));
@@ -151,7 +151,7 @@ export class ClipSession {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
-      const body = await response.json();
+      const body = await response.json() as {error?:string};
       if (id !== this.requestId) return;
       if (!response.ok) throw new Error(body.error || "Save failed.");
       const data = snapshot(body, slug);
@@ -169,7 +169,7 @@ export class ClipSession {
     this.update({ busy: "clear", status: "Clearing..." });
     try {
       const response = await this.fetcher("/api/clips/" + slug, { method: "DELETE" });
-      const body = await response.json();
+      const body = await response.json() as {error?:string};
       if (id !== this.requestId) return;
       if (!response.ok) throw new Error(body.error || "Clear failed.");
       const data = snapshot(body, slug);

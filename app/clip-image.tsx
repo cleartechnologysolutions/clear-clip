@@ -22,7 +22,7 @@ export function ClipImage({ slug, revision, disabled, onBusy }: { slug: string; 
     const created: string[] = [];
     try {
       const response = await fetch(endpoint + '?list=1', { cache: 'no-store' });
-      if (!response.ok) throw new Error((await response.json()).error || 'Could not load images.');
+      if (!response.ok) throw new Error(((await response.json()) as {error?:string}).error || 'Could not load images.');
       const data = await response.json() as { images: ImageInfo[] };
       const next: ImageInfo[] = [];
       for (const info of data.images) {
@@ -53,7 +53,7 @@ export function ClipImage({ slug, revision, disabled, onBusy }: { slug: string; 
       for (let i = 0; i < files.length; i++) {
         setMessage(`Uploading image ${i + 1} of ${files.length}…`);
         const response = await fetch(endpoint, { method: 'PUT', headers: { 'Content-Type': files[i].type }, body: files[i] });
-        if (!response.ok) throw new Error((await response.json()).error || 'Upload failed.');
+        if (!response.ok) throw new Error(((await response.json()) as {error?:string}).error || 'Upload failed.');
       }
     } catch (error) { errorMessage = error instanceof Error ? error.message : 'Upload failed.'; }
     finally {
@@ -67,7 +67,7 @@ export function ClipImage({ slug, revision, disabled, onBusy }: { slug: string; 
     working.current = true; ++sequence.current; setBusy(true); onBusy(true);
     try {
       const response = await fetch(`${endpoint}?slot=${slot}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error((await response.json()).error || 'Remove failed.');
+      if (!response.ok) throw new Error(((await response.json()) as {error?:string}).error || 'Remove failed.');
       replace(current.current.filter(item => item.slot !== slot)); setMessage('Image removed. Text and other images were kept.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Remove failed.'); }
     finally { working.current = false; setBusy(false); onBusy(false); }
