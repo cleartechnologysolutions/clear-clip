@@ -164,3 +164,21 @@ test("storage errors warn without blocking updates or destroying the draft", asy
   assert.equal(client.state.content, "Protected in this tab");
   assert.match(client.state.storageWarning, /backup unavailable/);
 });
+
+test('live polling adopts new uploads but keeps local drafts and performs no writes', async () => {
+  const server = sharedServer('First');
+  const receiver = new ClipSession(server.fetcher);
+  await receiver.open('abcd');
+  server.boards.set('abcd','Desktop copy');
+  await receiver.refresh(true);
+  assert.equal(receiver.state.content,'Desktop copy');
+  receiver.edit('My unsaved draft');
+  server.boards.set('abcd','Next desktop copy');
+  await receiver.refresh(true);
+  assert.equal(receiver.state.content,'My unsaved draft');
+  assert.equal(receiver.state.remote.content,'Next desktop copy');
+  server.offline(true);
+  await receiver.refresh(true);
+  assert.equal(receiver.state.content,'My unsaved draft');
+  assert.ok(server.calls.every(call => call.method === 'GET'));
+});
